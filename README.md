@@ -24,4 +24,4 @@ HTTP Headers : `Authorization = Bearer <access_token>`
 json payload : `{"username":"admin","password":"pass", "role": "roleType"}`
 
 ## create and send patient to all doctors
-json payload : `{"name":"name","contact_info":"contactinf", "": "roleType"}`
+json payload : `{"name":"name","contact_info":"contactinf", "medical_history": "roleType"}`

@@ -12,9 +12,15 @@ from tortoise.contrib.pydantic import pydantic_model_creator
 
 app = FastAPI()
 
-user_pydantic = pydantic_model_creator(User)
 role_pydantic = pydantic_model_creator(Role)
-patient_info_pydantic = pydantic_model_creator(PatientInfo)
+UserModel = User
+class UserPydantic(BaseModel):
+    id: int
+    username: str
+    # Add other fields as needed
+
+    class Config:
+        orm_mode = True
 
 
 # Secret key for JWT
@@ -41,15 +47,14 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     username = verify_token(credentials)
     # Assuming you have a User model with a method to retrieve the user by username
-    user = User.get_by_username(username)
+    user = User.get_or_none(username = username['sub'])
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
 # Function to generate JWT token
-def create_jwt_token(username: str, user:User):
-    user_role =  Role.get_or_none(user.role_id).type
-    payload = {"sub": username, "role": user_role}
+def create_jwt_token(username: str, role:Role):
+    payload = {"sub": username, role: role}
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 # User registration request model
@@ -65,7 +70,6 @@ class UserCreate(BaseModel):
         if role.lower() not in valid_roles:
             raise ValueError("Invalid role type, only (secretary, patient, doctor) are allowed")
         return role.lower()
-
 
 # User authentication request model
 class UserAuthenticate(BaseModel):
@@ -87,9 +91,9 @@ class UserResponse(BaseModel):
 
 # Route to get information about the currently authenticated user
 @app.get("/auth/me", response_model=UserResponse)
-async def get_current_user(user: User = Depends(verify_token)):
-    user_found = await User.get_or_none(User.username == user["sub"])
-    return UserResponse(username=user.username, role=user_pydantic(user_found))
+async def get_my_user(user: UserModel = Depends(get_current_user)):
+    user_found = await User.get_or_none(username=user.username)
+    return UserResponse(username=user_found.username, role=role_pydantic(user_found.role_id))
 
 # User registration route
 @app.post("/register", response_model=UserResponse)
@@ -99,7 +103,7 @@ async def register(user_data: UserCreate):
         if await User.filter(username=user_data.username).exists():
             raise HTTPException(status_code=400, detail="Username already exists")
         # Get the role object
-        role_found, _ = await Role.get_or_create(type=user_data.role.lower())
+        role_found = await Role.get_or_create(type=user_data.role.lower())
         print(role_found)
         if not role_found:
             raise HTTPException(status_code=400, detail="Invalid role type")
@@ -108,7 +112,7 @@ async def register(user_data: UserCreate):
         # Create the user
         user = await User.create(username=user_data.username, password_hash=hashed_password, role=role_found)
 
-    return UserResponse(username=user.username, role=user_pydantic(user).role)
+    return UserResponse(id=user.id, username=user.username, role=role_pydantic(user.role_id))
 
 # User authentication route
 @app.post("/login")
@@ -118,7 +122,7 @@ async def login(user_data: UserAuthenticate):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     
     # Generate JWT token
-    token = create_jwt_token(user.username, user)
+    token = create_jwt_token(user.username, user.role.type)
 
     return {"access_token": token}
 
@@ -153,8 +157,9 @@ async def send_patient_info(
     if not patient:
         raise HTTPException(status_code=404, detail="Patient information not found")
 
+    await PatientInfo.update_or_create(id=patient_id, )
     # Construct the message to be sent
-    message = f"Patient ID: {patient_id}\nInfo: {info}"
+    message = f"name: {name}\contact_info: {contact_info}\medical_info: {medical_info}\current_user: {current_user}\n from: {current_user.username}"
 
     # Send the message to all connected doctors using WebSocket
     for connected_username, connected_websocket in websocket_connections.items():

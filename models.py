@@ -18,7 +18,7 @@ class User(Model):
     id = fields.IntField(pk=True)
     username = fields.CharField(max_length=50, unique=True)
     password_hash = fields.CharField(max_length=255)
-    role_id = fields.ForeignKeyField('models.Role', related_name='userroles')
+    role_id = fields.ForeignKeyField('models.Role', related_name='roles')
 
     # Validation method for role types
     async def validate_role_type(cls, role_type: str):
