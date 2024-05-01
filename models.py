@@ -18,7 +18,7 @@ class User(Model):
     id = fields.IntField(pk=True)
     username = fields.CharField(max_length=50, unique=True)
     password_hash = fields.CharField(max_length=255)
-    role_id = fields.ForeignKeyField('models.Role', related_name='users')
+    role_id = fields.ForeignKeyField('models.Role', related_name='userroles')
 
     # Validation method for role types
     async def validate_role_type(cls, role_type: str):
@@ -32,10 +32,7 @@ class User(Model):
 # Define the PatientInfo model
 class PatientInfo(Model):
     id = fields.IntField(pk=True)
-    patient_id = fields.IntField(unique=True)
     name = fields.CharField(max_length=255)
     contact_info = fields.CharField(max_length=255)
     medical_info = fields.TextField()
-
-    def __str__(self):
-        return f"Patient ID: {self.patient_id}"
+    assigned_to = fields.ForeignKeyField('models.User', related_name='users')

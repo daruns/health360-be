@@ -12,18 +12,16 @@ uvicorn  main:app --reload
 |--------|-----------------------------|-------------------|-----------------------------------|
 | GET    | /users/me                                   | Private           | Get current user info     |
 | POST   | /auth/register                               | Public            | Register a new account               |
-| POST   | /auth/login                              | Public            | Register a new account               |
-| POST   | /patients/{id}/send                              | Public            | Register a new account               |
-| POST   | /auth/register                             | Public            | Register a new account               |
+| POST   | /auth/login                              | Public            | login               |
+| POST   | /patients/{id}/send                              | Public            | send a new patient               |
+| POST   | /patients/{id}/send{doctor_id}                              | Public            | send a new patient to a specific doctor  |
 
 ##  Login
 json payload : `{"username":"admin","password":"pass"}`
 HTTP Headers : `Authorization = Bearer <access_token>` 
 
 ## register
-No authentication required, just invalidate token</s>
+json payload : `{"username":"admin","password":"pass", "role": "roleType"}`
 
-##  Register user
-
-## "to create the database schema run:"
-`python3.11 creatSchema.py`
+## create and send patient to all doctors
+json payload : `{"name":"name","contact_info":"contactinf", "": "roleType"}`

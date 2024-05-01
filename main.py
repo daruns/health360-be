@@ -31,7 +31,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
-        return payload["sub"]
+        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.JWTError:
@@ -47,8 +47,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     return user
 
 # Function to generate JWT token
-def create_jwt_token(username: str):
-    payload = {"sub": username}
+def create_jwt_token(username: str, user:User):
+    user_role =  Role.get_or_none(user.role_id).type
+    payload = {"sub": username, "role": user_role}
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 # User registration request model
@@ -73,8 +74,11 @@ class UserAuthenticate(BaseModel):
 
 # Patient information request model
 class PatientInfoCreate(BaseModel):
-    patient_id: int
-    info: str
+    id: int
+    name: str
+    contact_info: str
+    medical_info: str
+    assigned_to: User
 
 # User response model
 class UserResponse(BaseModel):
@@ -82,10 +86,10 @@ class UserResponse(BaseModel):
     role: str
 
 # Route to get information about the currently authenticated user
-@app.get("/auth/me", response_model=User)
+@app.get("/auth/me", response_model=UserResponse)
 async def get_current_user(user: User = Depends(verify_token)):
-    await User.get_or_none(User.username == user["sub"])
-    return user_pydantic(user)
+    user_found = await User.get_or_none(User.username == user["sub"])
+    return UserResponse(username=user.username, role=user_pydantic(user_found))
 
 # User registration route
 @app.post("/register", response_model=UserResponse)
@@ -95,7 +99,7 @@ async def register(user_data: UserCreate):
         if await User.filter(username=user_data.username).exists():
             raise HTTPException(status_code=400, detail="Username already exists")
         # Get the role object
-        role_found = await Role.get_or_create(user_data.role.lower())
+        role_found, _ = await Role.get_or_create(type=user_data.role.lower())
         print(role_found)
         if not role_found:
             raise HTTPException(status_code=400, detail="Invalid role type")
@@ -114,15 +118,30 @@ async def login(user_data: UserAuthenticate):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     
     # Generate JWT token
-    token = create_jwt_token(user.username)
+    token = create_jwt_token(user.username, user)
 
     return {"access_token": token}
+
+# Route to create patient information
+@app.post("/patients")
+async def send_patient_info(
+    patient_info: PatientInfo,
+    current_user: User = Depends(verify_token)
+):
+    # Check if the current user is a doctor
+    if current_user.role != "doctor":
+        raise HTTPException(status_code=403, detail="Only doctors can send patient information")
+    await PatientInfo.create(**patient_info.dict(), assigned_to=current_user)
+
+    return {"message": "Patient information sent successfully to other doctors"}
 
 # Route to send patient information to authenticated doctors using WebSocket
 @app.post("/patients/{patient_id}/send_info")
 async def send_patient_info(
     patient_id: int,
-    info: str,
+    name: str,
+    medical_info: str,
+    contact_info: str,
     current_user: User = Depends(verify_token)
 ):
     # Check if the current user is a doctor
