@@ -81,6 +81,11 @@ class UserResponse(BaseModel):
     username: str
     role: str
 
+# Route to get information about the currently authenticated user
+@app.get("/auth/me", response_model=User)
+async def get_current_user(user: User = Depends(verify_token)):
+    await User.get_or_none(User.username == user["sub"])
+    return user_pydantic(user)
 
 # User registration route
 @app.post("/register", response_model=UserResponse)
@@ -90,7 +95,7 @@ async def register(user_data: UserCreate):
         if await User.filter(username=user_data.username).exists():
             raise HTTPException(status_code=400, detail="Username already exists")
         # Get the role object
-        role_found = await Role.get_or_none(user_data.role.lower())
+        role_found = await Role.get_or_create(user_data.role.lower())
         print(role_found)
         if not role_found:
             raise HTTPException(status_code=400, detail="Invalid role type")
