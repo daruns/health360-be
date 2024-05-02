@@ -11,9 +11,7 @@ from passlib.context import CryptContext
 from tortoise.contrib.pydantic import pydantic_model_creator
 
 app = FastAPI()
-
 role_pydantic = pydantic_model_creator(Role)
-UserModel = User
 class UserPydantic(BaseModel):
     id: int
     username: str
@@ -76,14 +74,6 @@ class UserAuthenticate(BaseModel):
     username: str
     password: str
 
-# Patient information request model
-class PatientInfoCreate(BaseModel):
-    id: int
-    name: str
-    contact_info: str
-    medical_info: str
-    assigned_to: User
-
 # User response model
 class UserResponse(BaseModel):
     username: str
@@ -91,7 +81,7 @@ class UserResponse(BaseModel):
 
 # Route to get information about the currently authenticated user
 @app.get("/auth/me", response_model=UserResponse)
-async def get_my_user(user: UserModel = Depends(get_current_user)):
+async def get_my_user(user = Depends(get_current_user)):
     user_found = await User.get_or_none(username=user.username)
     return UserResponse(username=user_found.username, role=role_pydantic(user_found.role_id))
 
@@ -129,7 +119,7 @@ async def login(user_data: UserAuthenticate):
 # Route to create patient information
 @app.post("/patients")
 async def send_patient_info(
-    patient_info: PatientInfo,
+    patient_info,
     current_user: User = Depends(verify_token)
 ):
     # Check if the current user is a doctor
